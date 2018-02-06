@@ -103,42 +103,11 @@ puppet_enterprise::profile::orchestrator::java_args:
   'XX:+UseG1GC': ''
 YAML
 
-cat > /root/compileplus.pp <<PUPPET
-pe_node_group { 'PE Infrastructure':
-  ensure             => 'present',
-  classes            => {
-    'puppet_enterprise' => {
-      'certificate_authority_host'   => 'pe.shadowsun.xyz',
-      'console_host'                 => 'pe.shadowsun.xyz',
-      'database_host'                => 'pe.shadowsun.xyz',
-      'mcollective_middleware_hosts' => ['pe.shadowsun.xyz'],
-      'pcp_broker_host'              => 'pe.shadowsun.xyz',
-      'puppetdb_host'                => 'pe.shadowsun.xyz',
-      'puppet_master_host'           => 'puppet.shadowsun.xyz',
-      'send_analytics_data'          => false
-    }
-  },
-  environment        => 'production',
-  environment_trumps => false,
-  parent             => 'All Nodes',
-}
-
+cat > /root/compileplus.pp <<'PUPPET'
 pe_node_group { 'PE Master':
-  ensure             => 'present',
-  classes            => {
-    'pe_repo'                                          => {},
-    'pe_repo::platform::ubuntu_1604_amd64'             => {},
-    'puppet_enterprise::profile::master'               => {
-      'check_for_updates' => false
-    },
-    'puppet_enterprise::profile::master::mcollective'  => {},
-    'puppet_enterprise::profile::mcollective::peadmin' => {}
-  },
-  environment        => 'production',
-  environment_trumps => false,
-  parent             => 'All Nodes',
-  pinned             => ['pe.shadowsun.xyz'],
-  rule               => ['or',
+  ensure => 'present',
+  parent => 'PE Infrastructure',
+  rule   => ['or',
   ['and',
     ['=',
       ['trusted', 'extensions', 'pp_role'],
@@ -147,31 +116,26 @@ pe_node_group { 'PE Master':
     ['=', 'name', 'pe.shadowsun.xyz']
   ],
 }
+
 pe_node_group { 'PE Master - Compile Master':
   ensure             => 'present',
   classes            => {
+    'pe_repo' => {
+      'compile_master_pool_address' => 'puppet.shadowsun.xyz'
+    },
     'puppet_enterprise::profile::master' => {
-      'puppetdb_host' => '${trusted["certname"]}'
+      'puppetdb_host' => ['${trusted[\'certname\']}']
     }
   },
-  environment        => 'production',
-  environment_trumps => false,
-  parent             => 'All Nodes',
+  parent             => 'PE Master',
   rule               => ['and',
   ['=',
     ['trusted', 'extensions', 'pp_role'],
-    'compile']
-  ],
+    'compile']],
 }
 pe_node_group { 'PE PuppetDB':
   ensure             => 'present',
-  classes            => {
-    'puppet_enterprise::profile::puppetdb' => { }
-  },
-  environment        => 'production',
-  environment_trumps => false,
-  parent             => 'All Nodes',
-  pinned             => ['pe.shadowsun.xyz'],
+  parent => 'PE Infrastructure',
   rule               => ['or',
   ['and',
     ['=',
@@ -185,12 +149,12 @@ pe_node_group { 'PE PuppetDB - Compile Master':
   ensure             => 'present',
   classes            => {
     'puppet_enterprise::profile::puppetdb' => {
-      'gc_interval' => 0
+      'gc_interval' => 0,
     }
   },
   environment        => 'production',
   environment_trumps => false,
-  parent             => 'All Nodes',
+  parent             => 'PE PuppetDB',
   rule               => ['and',
   ['=',
     ['trusted', 'extensions', 'pp_role'],
